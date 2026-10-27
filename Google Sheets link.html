@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Мои грошики</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="color-scheme" content="light dark">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Layout: one narrow column (phone first), hero balance on top, then tiles, categories, recent operations. Light and dark follow the device. */
+:root{
+  --bg:#F3F5F9;
+  --surface:#FFFFFF;
+  --surface-2:#EBEFF5;
+  --hero:#1A2F57;
+  --line:#E4E8EF;
+  --fg:#0F1722;
+  --muted:#5A6573;
+  --hero-muted:#C3D3EE;
+  --income:#0B6FC2;
+  --expense:#D1680A;
+  --warn:#8A5200;
+  --warn-bg:rgba(214,140,0,.14);
+  --err-bg:rgba(220,60,60,.10);
+  --err-fg:#B42323;
+  --on-accent:#FFFFFF;
+  --font:'Manrope',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0A0D12;--surface:#141922;--surface-2:#1E2530;--line:#222A35;--fg:#F2F4F7;--muted:#9AA4B2;
+    --income:#5AB8FF;--expense:#FFA94D;--warn:#FFC266;--warn-bg:rgba(255,194,102,.12);
+    --err-bg:rgba(255,120,120,.12);--err-fg:#FFA3A3;--on-accent:#0A0D12;color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0A0D12;--surface:#141922;--surface-2:#1E2530;--line:#222A35;--fg:#F2F4F7;--muted:#9AA4B2;
+  --income:#5AB8FF;--expense:#FFA94D;--warn:#FFC266;--warn-bg:rgba(255,194,102,.12);
+  --err-bg:rgba(255,120,120,.12);--err-fg:#FFA3A3;--on-accent:#0A0D12;color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{
+  margin:0;color:var(--fg);font-family:var(--font);font-size:14px;line-height:1.35;
+  padding-block:calc(20px + env(safe-area-inset-top,0px)) calc(32px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  -webkit-text-size-adjust:100%;
+}
+.wrap{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+button{font-family:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--income);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.eyebrow{font-size:13px;font-weight:600;color:var(--muted)}
+h1{margin:2px 0 0;font-size:30px;font-weight:800;letter-spacing:-.02em;text-wrap:balance}
+h1 .year{color:var(--muted);font-weight:600}
+.nav{display:flex;gap:8px}
+.circle{width:44px;height:44px;border:0;border-radius:999px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.circle:disabled{opacity:.35;cursor:default}
+.circle svg{width:20px;height:20px}
+
+.note{border-radius:16px;padding:12px 14px;font-size:13px;font-weight:600;background:var(--surface);color:var(--muted)}
+.note.warn{background:var(--warn-bg);color:var(--warn)}
+.note.err{background:var(--err-bg);color:var(--err-fg)}
+
+.hero{background:var(--hero);color:#F2F4F7;border-radius:28px;padding:22px;display:flex;flex-direction:column;gap:18px}
+.hero .lbl{font-size:13px;font-weight:600;color:var(--hero-muted)}
+.hero .big{display:block;margin-top:6px;font-size:52px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.meter{height:8px;border-radius:999px;background:rgba(255,255,255,.16);overflow:hidden}
+.meter i{display:block;height:100%;width:0;border-radius:999px;background:#FFB366}
+.meter-row{display:flex;justify-content:space-between;gap:12px;margin-top:8px;font-size:13px}
+.meter-row b{font-weight:700}
+.meter-row span{color:var(--hero-muted);font-weight:600}
+
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.tile{background:var(--surface);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.tile .h{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--muted)}
+.tile .h svg{width:18px;height:18px}
+.tile .v{font-size:22px;font-weight:800}
+.tile .s{font-size:12px;font-weight:600;color:var(--muted)}
+
+.card{background:var(--surface);border-radius:24px;padding:20px;display:flex;flex-direction:column;gap:16px}
+.card h2{margin:0;font-size:16px;font-weight:800}
+.empty{margin:0;color:var(--muted);font-size:13px;font-weight:600}
+
+.donut{position:relative;width:200px;height:200px;max-width:100%;align-self:center}
+.donut svg{display:block;width:100%;height:100%;transform:rotate(-90deg)}
+.dcenter{position:absolute;top:0;right:0;bottom:0;left:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.dcenter span{font-size:12px;font-weight:600;color:var(--muted)}
+.dcenter b{font-size:22px;font-weight:800}
+.cats{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.cat{display:flex;align-items:center;gap:12px;min-height:44px;border-top:1px solid var(--line)}
+.cat .dot{width:10px;height:10px;border-radius:3px;flex:none}
+.cat .name{flex:1;min-width:0;font-size:14px;font-weight:600}
+.cat .sum{font-size:14px;font-weight:700}
+.cat .pct{width:40px;text-align:right;font-size:13px;font-weight:500;color:var(--muted)}
+
+.ops{list-style:none;margin:0;padding:0}
+.op{display:flex;align-items:center;gap:12px;min-height:64px;border-top:1px solid var(--line)}
+.op:first-child{border-top:0}
+.ico{width:40px;height:40px;border-radius:999px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;flex:none}
+.ico svg{width:20px;height:20px}
+.op .txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.op .t{font-size:14px;font-weight:700;overflow-wrap:anywhere}
+.op .m{font-size:12px;font-weight:500;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.op .a{font-size:14px;font-weight:700}
+.op .a.in{color:var(--income)}
+.op .a.na{color:var(--muted)}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--warn-bg);color:var(--warn);font-size:11px;font-weight:700}
+.more{align-self:flex-start;min-height:44px;padding:0 18px;border:0;border-radius:999px;background:var(--surface-2);font-size:13px;font-weight:700;cursor:pointer}
+
+.foot{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--muted);font-size:12px;font-weight:600}
+.foot button{min-height:44px;padding:0 16px;border:0;border-radius:999px;background:var(--surface);font-size:13px;font-weight:700;cursor:pointer}
+.op-btn{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;margin:0;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+dialog{width:min(440px,calc(100vw - 32px));max-height:calc(100vh - 32px);padding:0;border:0;border-radius:24px;background:transparent;color:var(--fg);overflow:visible}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+.sheet{background:var(--surface);color:var(--fg);border-radius:24px;padding:20px;display:flex;flex-direction:column;gap:14px;font-family:var(--font)}
+.sheet h2{margin:0;font-size:18px;font-weight:800}
+.sheet .orig{margin:0;padding:10px 12px;border-radius:14px;background:var(--surface-2);color:var(--muted);font-size:13px;font-weight:600;overflow-wrap:anywhere}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:14px;background:var(--surface-2)}
+.opt{position:relative}
+.opt input{position:absolute;top:0;left:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.opt label{display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:10px;font-weight:700;color:var(--muted)}
+.opt input:checked+label{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.opt input:focus-visible+label{outline:2px solid var(--income);outline-offset:1px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:13px;font-weight:700;color:var(--muted)}
+.field input,.field select{min-height:48px;padding:0 14px;border-radius:14px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit;font-size:16px}
+.formerr{margin:0;padding:10px 12px;border-radius:14px;background:var(--err-bg);color:var(--err-fg);font-size:13px;font-weight:600}
+.btns{display:flex;gap:10px}
+.btn{flex:1;min-height:48px;padding:0 18px;border:0;border-radius:999px;font:inherit;font-size:15px;font-weight:800;cursor:pointer}
+.btn.primary{background:var(--income);color:var(--on-accent)}
+.btn.ghost{background:var(--surface-2);color:var(--fg)}
+.btn:disabled{opacity:.6;cursor:default}
+.busy{opacity:.55;transition:opacity .15s}
+@media (max-width:360px){.hero .big{font-size:44px}h1{font-size:26px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header class="top">
+    <div>
+      <span class="eyebrow">Мои грошики</span>
+      <h1 id="monthTitle">&nbsp;</h1>
+    </div>
+    <div class="nav">
+      <button class="circle" id="prev" aria-label="Предыдущий месяц"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <button class="circle" id="next" aria-label="Следующий месяц"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+    </div>
+  </header>
+
+  <div class="note" id="stateNote" hidden></div>
+  <div class="note warn" id="checkNote" hidden></div>
+
+  <section class="hero" aria-label="Баланс месяца">
+    <div>
+      <span class="lbl">Баланс месяца</span>
+      <span class="big num" id="balance">—</span>
+    </div>
+    <div>
+      <div class="meter" id="meter" role="img" aria-label="Доля расходов от дохода"><i id="meterFill"></i></div>
+      <div class="meter-row"><b id="meterLeft"></b><span class="num" id="meterRight"></span></div>
+    </div>
+  </section>
+
+  <div class="tiles">
+    <section class="tile" aria-label="Доходы">
+      <div class="h" style="color:var(--muted)"><svg viewBox="0 0 24 24" fill="none" style="stroke:var(--income)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>Доходы</div>
+      <span class="v num" id="incV">—</span>
+      <span class="s" id="incS"></span>
+    </section>
+    <section class="tile" aria-label="Расходы">
+      <div class="h"><svg viewBox="0 0 24 24" fill="none" style="stroke:var(--expense)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>Расходы</div>
+      <span class="v num" id="expV">—</span>
+      <span class="s" id="expS"></span>
+    </section>
+  </div>
+
+  <section class="card" aria-labelledby="catH">
+    <h2 id="catH">Куда ушли деньги</h2>
+    <div class="donut" id="donut" hidden></div>
+    <ul class="cats" id="cats"></ul>
+    <p class="empty" id="catsEmpty" hidden>Трат за этот месяц нет.</p>
+  </section>
+
+  <section class="card" aria-labelledby="opsH">
+    <h2 id="opsH">Операции</h2>
+    <ul class="ops" id="ops"></ul>
+    <p class="empty" id="opsEmpty" hidden>Операций за этот месяц нет.</p>
+    <button class="more" id="more" hidden></button>
+  </section>
+
+  <div class="foot">
+    <span id="updated">Загружаю…</span>
+    <button id="refresh">Обновить</button>
+  </div>
+</div>
+
+<dialog id="editor" aria-labelledby="edTitle">
+  <form class="sheet" id="edForm" novalidate>
+    <h2 id="edTitle">Исправить запись</h2>
+    <p class="orig" id="edOrig" hidden></p>
+    <div class="seg" role="radiogroup" aria-label="Тип записи">
+      <div class="opt"><input type="radio" name="edType" id="edExp" checked><label for="edExp">Расход</label></div>
+      <div class="opt"><input type="radio" name="edType" id="edInc"><label for="edInc">Доход</label></div>
+    </div>
+    <div class="field"><label for="edAmount">Сумма, ₴</label><input type="text" id="edAmount" inputmode="decimal" autocomplete="off" placeholder="250"></div>
+    <div class="field"><label for="edCat">Категория</label><select id="edCat"></select></div>
+    <div class="field"><label for="edDesc">Описание</label><input type="text" id="edDesc" maxlength="80" autocomplete="off"></div>
+    <p class="formerr" id="edErr" role="alert" hidden></p>
+    <div class="btns">
+      <button type="button" class="btn ghost" id="edCancel">Отмена</button>
+      <button type="submit" class="btn primary" id="edSave">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(function(){
+'use strict';
+var HOOK='https://hook.eu2.make.com/mk94j5krcn82q1wuw23ph8568f3qaneu';
+var MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+var SHORT=['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+var COL_D={'Другое':'#FFA94D','Покупки':'#4C8DFF','Продукты':'#5EEAD4','Транспорт':'#C084FC','Здоровье':'#F472B6','Кафе и рестораны':'#FACC15','Развлечения':'#A3E635','Жильё':'#F87171','Связь':'#E879F9'};
+var COL_L={'Другое':'#EE8420','Покупки':'#2F6FEB','Продукты':'#0FA595','Транспорт':'#9B51E0','Здоровье':'#E5489A','Кафе и рестораны':'#CF9A06','Развлечения':'#5F9E0B','Жильё':'#E5484D','Связь':'#C026D3'};
+var COL=COL_D,FALLBACK='#94A3B8';
+function isDark(){
+  var t=document.documentElement.getAttribute('data-theme');
+  if(t==='dark')return true;if(t==='light')return false;
+  return !!(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+function applyTheme(){
+  var d=isDark();COL=d?COL_D:COL_L;FALLBACK=d?'#94A3B8':'#64748B';
+  try{var tg=window.Telegram&&window.Telegram.WebApp;if(tg){var c=d?'#0A0D12':'#F3F5F9';if(tg.setHeaderColor)tg.setHeaderColor(c);if(tg.setBackgroundColor)tg.setBackgroundColor(c);}}catch(e){}
+}
+var ICONS={
+  cart:'M3 4h2l2.2 11h10l2-8H6.5M9 19h.01M17 19h.01',
+  bag:'M6 8h12l-1 12H7L6 8zM9 8a3 3 0 016 0',
+  cup:'M5 9h11v5a4 4 0 01-4 4H9a4 4 0 01-4-4V9zM16 10h2a2 2 0 010 4h-2',
+  plus:'M12 5v14M5 12h14',
+  car:'M5 16l1.5-6h11L19 16M5 16v3M19 16v3M5 16h14M8 13h.01M16 13h.01',
+  star:'M12 4l2.2 5 5.3.5-4 3.6 1.2 5.3L12 15.8 7.3 18.4l1.2-5.3-4-3.6 5.3-.5z',
+  phone:'M8 3h8v18H8zM11 18h2',
+  home:'M4 11l8-7 8 7v9H4z',
+  up:'M12 19V5M6 11l6-6 6 6',
+  dots:'M6 12h.01M12 12h.01M18 12h.01'
+};
+var CAT_ICON={'Продукты':'cart','Покупки':'bag','Кафе и рестораны':'cup','Здоровье':'plus','Транспорт':'car','Развлечения':'star','Связь':'phone','Жильё':'home','Другое':'dots'};
+
+/* Демо-данные: октябрь 2026, как в таблице. Показываются, только если ссылка открыта без ключа. */
+var DEMO=[['ID','Дата','Тип','Категория','Подкатегория','Описание','Сумма','Счёт','Источник','TG','Сообщение','Статус'],
+['1',46321,'Доход','Зарплата','Получение','Получение зарплаты',10000,'Наличные','Telegram','','','Записано'],
+['2',46321,'Расход','Продукты','Еда','Покупка еды',200,'Наличные','Telegram','','','Записано'],
+['3',46321,'Расход','Другое','Погашение долга','Погашение долга',700,'Наличные','Telegram','','','Записано'],
+['4',46321,'Расход','Покупки','Табачные изделия','Покупка сигарет',190,'Наличные','Telegram','','','Записано'],
+['5',46321,'Расход','Развлечения','Пиво','Покупка пива',60,'Наличные','Telegram','','','Записано'],
+['6',46321,'Расход','Транспорт','Самокат','Оплата услуги аренды самоката',500,'Наличные','Telegram','','','Записано'],
+['7',46321,'Расход','Покупки','Алкоголь','Алкоголь и пиво',800,'Наличные','Telegram','','','Записано'],
+['8',46321,'Расход','Другое','Прочие расходы','Не распознано','На проверку','Наличные','Telegram','','и 250 пива','Записано'],
+['9',46321,'Расход','Продукты','Продукты питания','Еда',400,'Наличные','Telegram','','','Записано'],
+['10',46321,'Расход','Другое','Долг','Погашение долга',1000,'Наличные','Telegram','','','Записано'],
+['11',46322,'Расход','Кафе и рестораны','Кофе/напитки','Покупка кофе и кока-колы',79,'Наличные','Telegram','','','Записано'],
+['12',46322,'Расход','Здоровье','Лекарства','Покупка медикаментов',250,'Наличные','Telegram','','','Записано'],
+['13',46322,'Расход','Продукты','Еда','Еда',180,'Наличные','Telegram','','','Записано'],
+['14',46322,'Расход','Продукты','Напитки','Покупка Кока-колы',55,'Наличные','Telegram','','','Записано'],
+['15',46322,'Расход','Покупки','Сигареты','Покупка сигарет',190,'Наличные','Telegram','','','Записано']];
+
+var K=''; try{K=new URLSearchParams(location.search).get('k')||'';}catch(e){}
+var ops=[], monthKey=null, showAll=false, demo=false, errText='', updated=null, busy=false;
+var $=function(id){return document.getElementById(id);};
+var nf=new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2});
+function money(n){return nf.format(Math.abs(n))+' ₴';}
+function signed(n){return (n<0?'−':'')+money(n);}
+function plural(n,f){var a=n%10,b=n%100;if(a===1&&b!==11)return f[0];if(a>=2&&a<=4&&(b<10||b>=20))return f[1];return f[2];}
+
+function toDate(v){
+  if(typeof v==='number'&&isFinite(v)){return new Date(Date.UTC(1899,11,30)+Math.floor(v)*86400000);}
+  var s=String(v==null?'':v).trim(),m;
+  if((m=s.match(/^(\d{4})-(\d{2})-(\d{2})/)))return new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));
+  if((m=s.match(/^(\d{2})\.(\d{2})\.(\d{4})/)))return new Date(Date.UTC(+m[3],+m[2]-1,+m[1]));
+  return null;
+}
+function mk(d){return d.getUTCFullYear()*12+d.getUTCMonth();}
+function todayKey(){
+  try{var p=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Kiev'}).format(new Date()).split('-');return (+p[0])*12+(+p[1])-1;}
+  catch(e){var d=new Date();return d.getFullYear()*12+d.getMonth();}
+}
+function parse(values){
+  var out=[];
+  for(var i=1;i<values.length;i++){
+    var r=values[i];if(!r||!r[0])continue;
+    var date=toDate(r[1]);if(!date)continue;
+    var raw=r[6];
+    var n=typeof raw==='number'?raw:parseFloat(String(raw==null?'':raw).replace(/\s/g,'').replace(',','.'));
+    var status=String(r[11]||'').trim();
+    out.push({i:i,row:i+1,id:String(r[0]),orig:String(r[10]||''),date:date,type:String(r[2]||'').trim(),cat:String(r[3]||'Другое').trim()||'Другое',desc:String(r[5]||r[4]||r[3]||'Без описания').trim(),amount:isFinite(n)?n:null,check:status==='На проверку'||!isFinite(n)});
+  }
+  return out;
+}
+function summarize(list){
+  var s={inc:0,exp:0,incN:0,expN:0,chk:0,noAmt:0},cats={};
+  list.forEach(function(o){
+    if(o.check)s.chk++;
+    if(o.amount==null){s.noAmt++;return;}
+    if(o.type==='Доход'){s.inc+=o.amount;s.incN++;}
+    else{s.exp+=o.amount;s.expN++;cats[o.cat]=(cats[o.cat]||0)+o.amount;}
+  });
+  s.cats=Object.keys(cats).map(function(k){return {name:k,sum:cats[k]};}).sort(function(a,b){return b.sum-a.sum;});
+  return s;
+}
+
+function svg(d,color){
+  var ns='http://www.w3.org/2000/svg',s=document.createElementNS(ns,'svg');
+  s.setAttribute('viewBox','0 0 24 24');s.setAttribute('fill','none');s.style.stroke=color;
+  s.setAttribute('stroke-width','2');s.setAttribute('stroke-linecap','round');s.setAttribute('stroke-linejoin','round');s.setAttribute('aria-hidden','true');
+  var p=document.createElementNS(ns,'path');p.setAttribute('d',d);s.appendChild(p);return s;
+}
+function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
+function fmtDate(d){return d.getUTCDate()+' '+SHORT[d.getUTCMonth()];}
+
+function render(){
+  applyTheme();
+  var cur=todayKey(),keys=ops.map(function(o){return mk(o.date);});
+  var lo=Math.min.apply(null,keys.concat([cur])),hi=Math.max.apply(null,keys.concat([cur]));
+  if(monthKey==null)monthKey=cur;
+  monthKey=Math.min(Math.max(monthKey,lo),hi);
+  var y=Math.floor(monthKey/12),m=monthKey%12;
+  var title=$('monthTitle');title.textContent=MONTHS[m]+' ';var yr=el('span','year',String(y));title.appendChild(yr);
+  $('prev').disabled=monthKey<=lo;$('next').disabled=monthKey>=hi;
+
+  var list=ops.filter(function(o){return mk(o.date)===monthKey;});
+  var s=summarize(list),bal=s.inc-s.exp;
+
+  var note=$('stateNote');
+  if(errText){note.textContent=errText;note.className='note err';note.hidden=false;}
+  else if(demo){note.textContent='Демо-данные. Ссылка открыта без ключа, поэтому показан пример за октябрь 2026. Исправления здесь не сохраняются.';note.className='note';note.hidden=false;}
+  else note.hidden=true;
+
+  var cn=$('checkNote');
+  if(s.chk>0){cn.textContent=s.chk+' '+plural(s.chk,['запись ждёт','записи ждут','записей ждут'])+' проверки. Нажми на запись с пометкой «Проверить» в списке ниже.'+(s.noAmt?' Записи без суммы не входят в итоги.':'');cn.hidden=false;}
+  else cn.hidden=true;
+
+  $('balance').textContent=signed(bal);
+  var fill=$('meterFill'),left=$('meterLeft'),right=$('meterRight');
+  if(s.inc>0){
+    var pct=s.exp/s.inc*100;
+    fill.style.width=Math.min(100,pct)+'%';
+    if(pct<=100){left.textContent='Потрачено '+Math.round(pct)+'% дохода';right.textContent='из '+money(s.inc);}
+    else{left.textContent='Расходы выше доходов';right.textContent='на '+money(s.exp-s.inc);}
+  }else{
+    fill.style.width='0';
+    left.textContent=s.exp>0?'В этом месяце нет доходов':'Операций за месяц нет';right.textContent='';
+  }
+  $('incV').textContent=money(s.inc);
+  $('incS').textContent=s.incN+' '+plural(s.incN,['поступление','поступления','поступлений']);
+  $('expV').textContent=money(s.exp);
+  $('expS').textContent=s.expN+' '+plural(s.expN,['трата','траты','трат']);
+
+  var cats=$('cats');cats.textContent='';
+  var dn=$('donut');dn.textContent='';dn.hidden=!(s.cats.length&&s.exp>0);
+  if(!dn.hidden){
+    var ns='http://www.w3.org/2000/svg',R=70,C=2*Math.PI*R,sv=document.createElementNS(ns,'svg');
+    sv.setAttribute('viewBox','0 0 180 180');sv.setAttribute('role','img');
+    sv.setAttribute('aria-label','Диаграмма расходов по категориям, всего '+money(s.exp));
+    function ring(color,len,off){
+      var c=document.createElementNS(ns,'circle');
+      c.setAttribute('cx','90');c.setAttribute('cy','90');c.setAttribute('r',String(R));c.setAttribute('fill','none');
+      c.setAttribute('stroke-width','22');c.style.stroke=color;
+      c.setAttribute('stroke-dasharray',len+' '+(C-len));c.setAttribute('stroke-dashoffset',String(-off));
+      return c;
+    }
+    sv.appendChild(ring('var(--line)',C,0));
+    var acc=0,gap=s.cats.length>1?2:0;
+    s.cats.forEach(function(c){
+      var len=c.sum/s.exp*C;
+      sv.appendChild(ring(COL[c.name]||FALLBACK,Math.max(len-gap,1.5),acc));
+      acc+=len;
+    });
+    dn.appendChild(sv);
+    var ctr=el('div','dcenter');ctr.appendChild(el('span',null,'Всего'));ctr.appendChild(el('b','num',money(s.exp)));dn.appendChild(ctr);
+  }
+  s.cats.forEach(function(c){
+    var share=s.exp>0?c.sum/s.exp*100:0;
+    var li=el('li','cat'),dot=el('span','dot');dot.style.background=COL[c.name]||FALLBACK;
+    li.appendChild(dot);li.appendChild(el('span','name',c.name));li.appendChild(el('span','sum num',money(c.sum)));
+    li.appendChild(el('span','pct',share>0&&share<1?'<1%':Math.round(share)+'%'));
+    cats.appendChild(li);
+  });
+  $('catsEmpty').hidden=s.cats.length>0;
+
+  var sorted=list.slice().sort(function(a,b){return (b.check-a.check)||(b.date-a.date)||(b.i-a.i);});
+  var vis=showAll?sorted:sorted.slice(0,8);
+  var ul=$('ops');ul.textContent='';
+  vis.forEach(function(o){
+    var li=el('li','op'),isIn=o.type==='Доход',color=isIn?'var(--income)':(COL[o.cat]||FALLBACK);
+    var box=li;
+    if(o.check){box=el('button','op-btn');box.type='button';box.setAttribute('aria-label','Исправить запись: '+o.desc);box.addEventListener('click',function(){openEditor(o);});li.appendChild(box);}
+    var ico=el('span','ico');ico.appendChild(svg(ICONS[isIn?'up':(CAT_ICON[o.cat]||'dots')],color));box.appendChild(ico);
+    var txt=el('div','txt');txt.appendChild(el('span','t',o.desc));
+    var meta=el('span','m',o.cat+' · '+fmtDate(o.date));
+    if(o.check)meta.appendChild(el('span','pill','Проверить'));
+    txt.appendChild(meta);box.appendChild(txt);
+    var a=el('span','a num',o.amount==null?'—':(isIn?'+':'−')+money(o.amount));
+    if(o.amount==null)a.className+=' na';else if(isIn)a.className+=' in';
+    box.appendChild(a);ul.appendChild(li);
+  });
+  $('opsEmpty').hidden=sorted.length>0;
+  var more=$('more');
+  if(sorted.length>8){more.hidden=false;more.textContent=showAll?'Свернуть':'Показать все ('+sorted.length+')';}
+  else more.hidden=true;
+
+  $('updated').textContent=busy?'Загружаю…':(demo?'Демо-данные':(updated?'Обновлено в '+updated.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})+' · из таблицы':'—'));
+  $('app').className='wrap'+(busy?' busy':'');
+}
+
+function load(){
+  if(!K){demo=true;ops=parse(DEMO);busy=false;errText='';render();return;}
+  busy=true;errText='';render();
+  var ctl=typeof AbortController!=='undefined'?new AbortController():null;
+  var t=setTimeout(function(){if(ctl)ctl.abort();},25000);
+  fetch(HOOK+'?k='+encodeURIComponent(K),{cache:'no-store',signal:ctl?ctl.signal:undefined})
+    .then(function(r){if(r.status===403)throw new Error('forbidden');if(!r.ok)throw new Error('http '+r.status);return r.json();})
+    .then(function(j){ops=parse(j&&j.values?j.values:[]);demo=false;updated=new Date();})
+    .catch(function(e){errText=e&&e.message==='forbidden'?'Нет доступа: ключ в ссылке не подошёл.':'Не удалось загрузить данные. Проверь интернет и нажми «Обновить».';})
+    .then(function(){clearTimeout(t);busy=false;render();});
+}
+
+var EXP=['Продукты','Кафе и рестораны','Транспорт','Жильё','Здоровье','Покупки','Развлечения','Связь','Другое'];
+var INC=['Зарплата','Подработка','Подарок','Другое'];
+var edOp=null,edBusy=false;
+function fillCats(type,sel){
+  var list=type==='Доход'?INC:EXP,s=$('edCat');s.textContent='';
+  list.forEach(function(c){var o=document.createElement('option');o.value=c;o.textContent=c;s.appendChild(o);});
+  s.value=list.indexOf(sel)>=0?sel:'Другое';
+}
+function edType(){return $('edInc').checked?'Доход':'Расход';}
+function openEditor(o){
+  edOp=o;edBusy=false;$('edErr').hidden=true;
+  var t=o.type==='Доход'?'Доход':'Расход';
+  $('edInc').checked=t==='Доход';$('edExp').checked=t==='Расход';
+  fillCats(t,o.cat);
+  $('edAmount').value=o.amount!=null?String(o.amount):'';
+  $('edDesc').value=(o.desc==='Не распознано'&&o.orig?o.orig:o.desc).slice(0,80);
+  $('edOrig').textContent=o.orig?'Ты написал боту: «'+o.orig+'»':'';$('edOrig').hidden=!o.orig;
+  $('edSave').disabled=false;$('edSave').textContent='Сохранить';
+  var d=$('editor');if(d.showModal)d.showModal();else d.setAttribute('open','');
+  setTimeout(function(){try{$('edAmount').focus();}catch(e){}},50);
+}
+function closeEditor(){var d=$('editor');if(d.close)d.close();else d.removeAttribute('open');edOp=null;}
+function edFail(msg){var e=$('edErr');e.textContent=msg;e.hidden=false;$('edSave').disabled=false;$('edSave').textContent='Сохранить';edBusy=false;}
+function applyLocal(o,v){o.type=v.type;o.cat=v.cat;o.desc=v.desc;o.amount=v.amount;o.check=false;}
+function saveEdit(ev){
+  ev.preventDefault();if(!edOp||edBusy)return;
+  var amt=$('edAmount').value.replace(/\s/g,'').replace(',','.');
+  if(!/^\d{1,9}([.]\d{1,2})?$/.test(amt)||!(parseFloat(amt)>0)){edFail('Введи сумму числом, например 250 или 99,50.');return;}
+  var v={type:edType(),cat:$('edCat').value,desc:($('edDesc').value.trim()||$('edCat').value).slice(0,80),amount:parseFloat(amt)};
+  var op=edOp;
+  if(demo){applyLocal(op,v);closeEditor();render();return;}
+  edBusy=true;$('edSave').disabled=true;$('edSave').textContent='Сохраняю…';$('edErr').hidden=true;
+  var q='?k='+encodeURIComponent(K)+'&a=save&row='+op.row+'&id='+encodeURIComponent(op.id)+'&type='+encodeURIComponent(v.type)+'&cat='+encodeURIComponent(v.cat)+'&amount='+encodeURIComponent(amt)+'&desc='+encodeURIComponent(v.desc);
+  fetch(HOOK+q,{cache:'no-store'})
+    .then(function(r){if(r.status===409)throw new Error('changed');return r.json();})
+    .then(function(j){if(!j||j.ok!==true)throw new Error('fail');applyLocal(op,v);edBusy=false;closeEditor();render();load();})
+    .catch(function(e){edFail(e&&e.message==='changed'?'Таблица изменилась. Закрой окно, нажми «Обновить» и открой запись снова.':'Не удалось сохранить. Проверь интернет и попробуй ещё раз.');});
+}
+$('edForm').addEventListener('submit',saveEdit);
+$('edCancel').addEventListener('click',closeEditor);
+$('edInc').addEventListener('change',function(){fillCats('Доход',$('edCat').value);});
+$('edExp').addEventListener('change',function(){fillCats('Расход',$('edCat').value);});
+$('editor').addEventListener('click',function(e){if(e.target===$('editor'))closeEditor();});
+
+$('prev').addEventListener('click',function(){monthKey-=1;showAll=false;render();});
+$('next').addEventListener('click',function(){monthKey+=1;showAll=false;render();});
+$('more').addEventListener('click',function(){showAll=!showAll;render();});
+$('refresh').addEventListener('click',load);
+document.addEventListener('visibilitychange',function(){if(!document.hidden&&K&&updated&&Date.now()-updated.getTime()>60000)load();});
+
+try{var tg0=window.Telegram&&window.Telegram.WebApp;if(tg0){tg0.ready();if(tg0.expand)tg0.expand();}}catch(e){}
+try{
+  var mq=window.matchMedia('(prefers-color-scheme: dark)');
+  if(mq.addEventListener)mq.addEventListener('change',render);else if(mq.addListener)mq.addListener(render);
+}catch(e){}
+try{new MutationObserver(render).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});}catch(e){}
+
+load();
+})();
+</script>
+</body>
+</html>
